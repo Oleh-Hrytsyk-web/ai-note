@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": ".test-build",
+    "types": []
+  },
+  "include": ["src/services/noteParser/**/*.ts", "src/types/note.ts"]
+}

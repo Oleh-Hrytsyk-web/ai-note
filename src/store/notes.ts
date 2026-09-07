@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { isNote, type Note, type NoteType } from '../types/note';
+import { isNote, type Note, type NoteType, type NoteMetadata } from '../types/note';
 
 const STORAGE_KEY = '@ai-note/notes-v1';
 interface NotesState {
@@ -8,7 +8,7 @@ interface NotesState {
   hydrated: boolean;
   storageError: string | null;
   hydrate: () => Promise<void>;
-  addNote: (text: string, type?: NoteType) => string | null;
+  addNote: (text: string, type?: NoteType, metadata?: NoteMetadata) => string | null;
   updateNote: (id: string, text: string, type: NoteType) => void;
   toggleCompleted: (id: string) => void;
 }
@@ -47,11 +47,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     })();
     return hydration;
   },
-  addNote: (text, type = 'note') => {
+  addNote: (text, type = 'note', metadata = {}) => {
     if (!text.trim() || !get().hydrated) return null;
     const now = new Date().toISOString();
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
-    const notes = [{ id, text: text.trim(), type, createdAt: now, updatedAt: now, completed: false }, ...get().notes];
+    const notes = [{ ...metadata, id, text: text.trim(), type, createdAt: now, updatedAt: now, completed: false }, ...get().notes];
     set({ notes }); persist(notes); return id;
   },
   updateNote: (id, text, type) => {

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteCard } from '../../components/NoteCard';
+import { CapturePreview } from '../../components/CapturePreview';
 import { Button, Icon, SectionLabel } from '../../components/ui';
 import { useNotesStore } from '../../store/notes';
 import { colors, typeMeta } from '../../theme';
@@ -15,11 +16,17 @@ export default function HomeScreen() {
   const [filter, setFilter] = useState<NoteType | 'all'>('all');
   const input = useRef<TextInput>(null);
   const [message, setMessage] = useState('');
+  const [pending, setPending] = useState<string | null>(null);
   const visible = notes.filter(n => filter === 'all' || n.type === filter);
   function capture() {
-    if (addNote(text)) { setText(''); setFilter('all'); setMessage('Thought added to your notebook.'); Keyboard.dismiss(); }
+    if (text.trim()) { Keyboard.dismiss(); setPending(text); }
   }
   return <SafeAreaView edges={['top']} style={s.safe}>
+    {pending !== null && <CapturePreview text={pending} onCancel={() => setPending(null)} onSave={parsed => {
+      if (addNote(parsed.text, parsed.type, { scheduledDate: parsed.date, scheduledTime: parsed.time, items: parsed.items, confidence: parsed.confidence })) {
+        setText(''); setFilter('all'); setMessage('Thought added to your notebook.'); setPending(null);
+      }
+    }} />}
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList data={visible} keyExtractor={n => n.id} renderItem={({ item }) => <NoteCard note={item} />}
         keyboardShouldPersistTaps="handled" contentContainerStyle={s.list}
@@ -33,7 +40,7 @@ export default function HomeScreen() {
               value={text} onChangeText={setText} multiline maxLength={20000} style={s.input} textAlignVertical="top" />
             <View style={s.captureBottom}>
               <View style={s.voice}><Pressable accessibilityRole="button" accessibilityLabel="Voice input coming soon" accessibilityState={{ disabled: true }} disabled style={s.mic}><Icon name="mic-outline" color={colors.muted} /></Pressable><Text style={s.voiceText}>Voice soon</Text></View>
-              <Button label="Add thought ↗" onPress={capture} disabled={!text.trim()} />
+              <Button label="Review thought ↗" onPress={capture} disabled={!text.trim()} />
             </View>
           </View>
           <Text accessibilityLiveRegion="polite" style={s.hint}>{message || 'Capture now. Make room for what’s next.'}</Text>

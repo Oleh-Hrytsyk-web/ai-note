@@ -46,6 +46,7 @@ Thumbs.db
 
 # test and build output
 coverage/
+.test-build/
 build/
 
 # typescript

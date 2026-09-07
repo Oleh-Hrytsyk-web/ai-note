@@ -33,6 +33,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test tests/*.test.cjs",
     "lint": "eslint .",
     "export:web": "expo export --platform web"
   },
