@@ -15,7 +15,6 @@ export default function SettingsScreen() {
     <Text style={s.caption}>Notes are saved locally. Clearing app data or uninstalling the app can remove them. On web, each browser keeps its own notebook.</Text>
     <SectionLabel>COMING LATER</SectionLabel>
     <View style={s.card}>{[
-      ['mic-outline', 'Voice capture', 'Speak your thoughts naturally.'],
       ['sparkles-outline', 'AI organization', 'Let your notebook find the right type.'],
       ['notifications-outline', 'Scheduled reminders', 'A nudge at just the right time.'],
       ['cloud-outline', 'Cloud sync', 'Your thoughts, across your devices.'],

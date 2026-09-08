@@ -4,6 +4,7 @@ import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteCard } from '../../components/NoteCard';
 import { CapturePreview } from '../../components/CapturePreview';
+import { VoiceCapture } from '../../components/VoiceCapture';
 import { Button, Icon, SectionLabel } from '../../components/ui';
 import { useNotesStore } from '../../store/notes';
 import { colors, typeMeta } from '../../theme';
@@ -17,6 +18,7 @@ export default function HomeScreen() {
   const input = useRef<TextInput>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
   const visible = notes.filter(n => filter === 'all' || n.type === filter);
   function capture() {
     if (text.trim()) { Keyboard.dismiss(); setPending(text); }
@@ -37,11 +39,14 @@ export default function HomeScreen() {
           <Text style={s.subtitle}>An idea, a to-do, a little thing to remember.</Text>
           <View style={s.capture}>
             <TextInput ref={input} accessibilityLabel="Quick thought" placeholder="What’s on your mind?" placeholderTextColor={colors.muted}
-              value={text} onChangeText={setText} multiline maxLength={20000} style={s.input} textAlignVertical="top" />
+              value={text} onChangeText={setText} editable={!voiceBusy} multiline maxLength={20000} style={s.input} textAlignVertical="top" />
             <View style={s.captureBottom}>
-              <View style={s.voice}><Pressable accessibilityRole="button" accessibilityLabel="Voice input coming soon" accessibilityState={{ disabled: true }} disabled style={s.mic}><Icon name="mic-outline" color={colors.muted} /></Pressable><Text style={s.voiceText}>Voice soon</Text></View>
-              <Button label="Review thought ↗" onPress={capture} disabled={!text.trim()} />
+              <Button label="Review thought ↗" onPress={capture} disabled={!text.trim() || voiceBusy} />
             </View>
+            <VoiceCapture onBusy={setVoiceBusy} onTranscript={transcript => {
+              const combined = [text.trim(), transcript.trim()].filter(Boolean).join('\n');
+              setText(combined); Keyboard.dismiss(); setPending(combined);
+            }} />
           </View>
           <Text accessibilityLiveRegion="polite" style={s.hint}>{message || 'Capture now. Make room for what’s next.'}</Text>
           <View style={s.section}><Text style={s.sectionTitle}>Your thoughts</Text><Text style={s.count}>{notes.length} {notes.length === 1 ? 'thought' : 'thoughts'}</Text></View>

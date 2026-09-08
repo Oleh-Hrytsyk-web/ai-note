@@ -15,8 +15,9 @@ npm start
 ```
 
 If you already have this working copy, open its directory and start at `npm ci`.
-Scan the terminal QR code using an Expo Go version that supports SDK 57. The
-phone and development computer should be on the same network. For platform
+Open the QR code with the installed AI Note development build. Voice requires
+this build, not Expo Go (see the Android instructions below). The phone and
+development computer should be on the same network. For platform
 requirements and SDK details, see the [Expo SDK 57 documentation](https://docs.expo.dev/versions/v57.0.0/).
 
 ```sh
@@ -47,7 +48,7 @@ Home capture reviews the text with the local parser before saving. The preview
 shows the suggested type, original trimmed text, date/time, and shopping items.
 Change the type, save, or cancel to return to the untouched input. Nothing is
 stored before confirmation. The dedicated new-note editor remains a manual flow.
-The microphone is disabled and labeled as coming soon. A `reminder` is currently
+The microphone opens native voice capture in a development build. A `reminder` is currently
 just a category; it does not schedule a notification.
 
 ## Architecture
@@ -178,7 +179,7 @@ Recommended Stage 3: editable structured fields and richer date interpretation,
 including clarification for ambiguous input, followed by native device testing.
 Keep notification scheduling separate until its permissions and behavior are designed.
 
-Add voice capture and transcription, then AI classification behind the existing
+Add AI classification behind the existing
 capture/editor boundary. Add reminder scheduling when notification permissions
 and dates are designed. Cloud sync will need durable identifiers, a migration
 strategy, conflict handling, and a backend. Authentication and payments are not
@@ -187,3 +188,119 @@ part of this foundation.
 Runtime dependencies are the requested stack, Expo Router's supporting native
 packages, icons/fonts, and React Native Web for preview. Reanimated and Worklets
 are pinned to Expo's compatible versions for Router's native dependency tree.
+
+## Stage 3: Voice capture
+
+Tap the microphone on Home, grant permissions, speak, and tap **Stop and review**.
+The device may also end recognition automatically after a pause. The final
+transcript is appended to any existing draft, shown in the capture input, and
+sent through the same `noteParser` and `CapturePreview` as typed text. Nothing
+is saved until you confirm. Cancel discards the current recording and leaves
+your earlier draft intact; cancelling the preview keeps the transcript editable.
+
+The warm capture card now includes System / English / Ukrainian language choices,
+permission-request, listening (elapsed seconds), transcribing, and error states.
+The session stops after 60 seconds at most, and stalled startup/transcription
+times out after 15 seconds. Cancel is available during permission requests,
+listening, and processing. Leaving Home or backgrounding the app cancels capture.
+
+Architecture:
+
+```text
+src/services/speech/
+  types.ts           SpeechService, SpeechDriver, event and snapshot contracts
+  speechSession.ts   Provider-independent lifecycle and cancellation handling
+  index.ts           Factory, native adapter, lazy module loading, locale default
+src/components/VoiceCapture.tsx  Small controls that depend only on SpeechService
+tests/speechSession.test.cjs    Mocked session lifecycle tests (no microphone)
+eas.json                       Optional internal development APK build profile
+```
+
+The service exposes async `start(language?)`, `stop()` (final transcript),
+`cancel()`, and snapshot subscriptions. Generation guards ignore late events
+and permission results after cancellation. Timers/listeners are released when
+sessions finish. Provider errors map to readable permission, no-speech, network,
+language, or recognition messages. Only final results enter the notebook flow.
+
+Recognition uses [expo-speech-recognition](https://github.com/jamsch/expo-speech-recognition),
+version 57 for Expo SDK 57, wrapping Android SpeechRecognizer and iOS
+SFSpeechRecognizer. No AI/LLM API, key, backend, or speech-upload code is added.
+Audio files are not persisted by the app. The operating system speech provider
+may send audio to its own servers and may require a network connection; offline
+recognition is not guaranteed. This is stated beside the microphone.
+
+English (`en-US`) and Ukrainian (`uk-UA`) can be requested; availability depends
+on your installed recognition service, language models, device, and OS. System
+uses `expo-localization`'s first device locale (English fallback). Unsupported
+languages produce a helpful message rather than silently switching languages.
+The Stage 2 parser is still English-only: Ukrainian transcripts can be saved
+and manually classified, but Ukrainian dates/items are not automatically parsed.
+
+### Expo Go and platform limitations
+
+**Voice does not work in Expo Go.** Install an AI Note development build with
+the native module. The module loads lazily, so Expo Go can still support typed
+notes and shows a useful message on a microphone tap. `npx expo start --go`
+explicitly selects Expo Go; regular `npm start` selects the development client.
+
+Web intentionally supports typed capture only and shows an unsupported-platform
+message on microphone tap. Browser speech APIs are not used. An Android phone
+needs an enabled speech recognition service (commonly Google's); devices without
+one receive a helpful error. Real-device testing is recommended over simulators.
+
+`app.json` contains the native package identifiers and the speech config plugin.
+The plugin adds Android RECORD_AUDIO permission and recognition-service visibility,
+plus iOS microphone and speech-recognition descriptions. Runtime permission is
+requested only after tapping the microphone. If denied, enable Microphone (and
+Speech Recognition on iOS) in system app settings and retry.
+
+### Test on your Android phone
+
+Local build option (no Expo cloud account needed):
+
+1. Install Android Studio with Android SDK/platform tools and its supported JDK;
+   configure the Android development environment and USB debugging on your phone.
+2. Connect the phone by USB and authorize USB debugging. Confirm it appears in
+   `adb devices`.
+3. In the repository run:
+
+   ```sh
+   npm ci
+   npm run android:device
+   ```
+
+   This generates the ignored native Android project, builds the development app,
+   and installs it on your selected phone. For subsequent JavaScript sessions,
+   use `npm start` and open the project in the installed AI Note development app.
+   Keep the phone and computer on the same network.
+
+Alternative without a local Android build toolchain (requires an Expo account):
+
+```sh
+npx eas-cli@latest login
+npx eas-cli@latest build --platform android --profile development
+```
+
+Follow EAS project setup prompts, install the resulting internal APK on your
+phone, then run `npm start` locally and scan the QR code using the development
+app. Building on EAS uploads the project and uses your account's build allowance;
+no cloud build has been submitted as part of this implementation.
+
+On macOS with Xcode, use `npx expo run:ios --device` for an iPhone build (Apple
+signing is required). Rebuild the native app after changing native dependencies
+or config-plugin permissions; a Metro refresh alone cannot add native modules.
+After installing new JS dependencies, restart Metro with `npm start -- --clear`
+if an old running server reports stale module-resolution errors.
+
+Phone smoke test: grant permissions; speak an English shopping list; stop and
+review; verify no note exists before Save; save and reopen. Then test Ukrainian,
+silence, permission denial, cancellation during listening, and leaving Home.
+
+Validation: 30 tests pass (18 existing parser/model tests and 12 speech lifecycle
+tests), TypeScript and ESLint pass, Expo Doctor passes all 21 checks, and
+web/Android/iOS JS/Hermes exports pass. Native APK/IPA compilation and actual
+microphone recognition have not been tested here: this workspace has no Android
+SDK/JDK or connected phone available. Bundling does not replace a device test.
+
+Recommended Stage 4: editable transcripts/structured fields and Ukrainian parser
+rules, plus real-device voice QA before adding any external AI provider.

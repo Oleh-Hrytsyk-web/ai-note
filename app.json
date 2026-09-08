@@ -8,9 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.olehhrytsyk.ainote",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.olehhrytsyk.ainote",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -26,7 +28,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      ["expo-speech-recognition", {
+        "microphonePermission": "Allow AI Note to capture your spoken thoughts.",
+        "speechRecognitionPermission": "Allow AI Note to turn your speech into text."
+      }],
+      "expo-localization"
     ]
   }
 }
