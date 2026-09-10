@@ -9,7 +9,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.olehhrytsyk.ainote",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow AI Note to turn your speech into text.",
+        "NSMicrophoneUsageDescription": "Allow AI Note to capture your spoken thoughts."
+      }
     },
     "android": {
       "package": "com.olehhrytsyk.ainote",
@@ -19,7 +23,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -29,11 +36,21 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      ["expo-speech-recognition", {
-        "microphonePermission": "Allow AI Note to capture your spoken thoughts.",
-        "speechRecognitionPermission": "Allow AI Note to turn your speech into text."
-      }],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow AI Note to capture your spoken thoughts.",
+          "speechRecognitionPermission": "Allow AI Note to turn your speech into text."
+        }
+      ],
       "expo-localization"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "de1b7b45-2f64-45fb-9c91-62395fd0848d"
+      }
+    },
+    "owner": "oleggrytsyk34"
   }
 }
