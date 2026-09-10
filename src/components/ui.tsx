@@ -18,12 +18,12 @@ export function Button({ label, onPress, disabled = false, secondary = false }: 
 }
 
 export function TypePicker({ value, onChange }: { value: NoteType; onChange: (type: NoteType) => void }) {
-  return <View style={styles.types}>{noteTypes.map(type => <Pressable key={type} accessibilityRole="button"
+  return <View><View style={styles.types}>{noteTypes.map(type => <Pressable key={type} accessibilityRole="button"
     accessibilityLabel={`Type: ${typeMeta[type].label}`} accessibilityState={{ selected: value === type }} aria-pressed={value === type}
     onPress={() => onChange(type)} style={[styles.chip, value === type && { backgroundColor: colors.soft, borderColor: colors.primary }]}>
     <Icon name={typeMeta[type].icon} size={16} color={value === type ? colors.primary : colors.muted} />
     <Text style={{ color: value === type ? colors.primary : colors.muted, fontSize: 13 }}>{typeMeta[type].label}</Text>
-  </Pressable>)}</View>;
+  </Pressable>)}</View><Text style={{ color: colors.muted, fontSize: 12, lineHeight: 19, marginTop: 12 }}>{({ note: 'Information or a thought. No action required.', task: 'Something you need to do. Check it off when finished.', reminder: 'A task or event with a date or time. Notifications are not enabled yet.', shopping: 'Items to buy. Check off the list after shopping.' })[value]}</Text></View>;
 }
 
 export function SectionLabel({ children }: { children: ReactNode }) {

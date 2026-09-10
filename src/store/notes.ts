@@ -6,6 +6,9 @@ const STORAGE_KEY = '@ai-note/notes-v1';
 interface NotesState {
   notes: Note[];
   hydrated: boolean;
+  savedId: string | null;
+  savedRevision: number;
+  acknowledgeSave: () => void;
   storageError: string | null;
   hydrate: () => Promise<void>;
   addNote: (text: string, type?: NoteType, metadata?: NoteMetadata) => string | null;
@@ -28,6 +31,7 @@ function persist(notes: Note[]) {
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
+  savedId: null, savedRevision: 0, acknowledgeSave: () => set({ savedId: null }),
   notes: [], hydrated: false, storageError: null,
   hydrate: () => {
     if (get().hydrated) return Promise.resolve();
@@ -52,13 +56,14 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const now = new Date().toISOString();
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
     const notes = [{ ...metadata, id, text: text.trim(), type, createdAt: now, updatedAt: now, completed: false }, ...get().notes];
-    set({ notes }); persist(notes); return id;
+    set({ notes, savedId: id, savedRevision: get().savedRevision + 1 }); persist(notes); return id;
   },
   updateNote: (id, text, type) => {
     if (!text.trim() || !get().hydrated) return;
     const notes = get().notes.map(n => n.id === id ? { ...n, text: text.trim(), type,
       completed: type === 'note' ? false : n.completed, updatedAt: new Date().toISOString() } : n);
-    set({ notes }); persist(notes);
+    notes.sort((a, b) => Number(b.id === id) - Number(a.id === id));
+    set({ notes, savedId: id, savedRevision: get().savedRevision + 1 }); persist(notes);
   },
   toggleCompleted: (id) => {
     if (!get().hydrated) return;

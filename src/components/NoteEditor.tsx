@@ -16,16 +16,15 @@ export function NoteEditor({ note }: { note?: Note }) {
   const dirty = text !== (note?.text ?? '') || type !== (note?.type ?? 'note');
   function save() {
     if (!text.trim()) return;
-    if (note) { updateNote(note.id, text, type); setText(text.trim()); setSaved(true); }
-    else { const id = addNote(text, type); if (id) router.replace({ pathname: '/note/[id]', params: { id } }); }
+    if (note) { updateNote(note.id, text, type); router.dismissTo('/'); }
+    else { const id = addNote(text, type); if (id) router.dismissTo('/'); }
   }
   return <SafeAreaView edges={['bottom']} style={s.safe}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
       <Text style={s.title}>{note ? 'A thought worth keeping.' : 'Make a little room.'}</Text>
       <Text style={s.date}>{note ? `Created ${new Date(note.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : 'Get it out of your head and onto the page.'}</Text>
       <SectionLabel>KEEP IT AS</SectionLabel><TypePicker value={type} onChange={value => { setType(value); setSaved(false); }} />
-      {type === 'reminder' && <Text style={s.helper}>A place to remember. Scheduled notifications are coming later.</Text>}
-      {(note?.scheduledDate || note?.scheduledTime) && <Text style={s.helper}>Captured schedule: {note.scheduledDate ?? 'No date'} · {note.scheduledTime ?? 'No time'}. No notification scheduled.</Text>}
+      {(note?.scheduledDate || note?.scheduledTime) && <Text style={[s.helper, { color: colors.primary, fontSize: 16, fontWeight: '600', backgroundColor: colors.soft, padding: 14, borderRadius: 12 }]}>Scheduled for: {note.scheduledDate ?? 'No date'} · {note.scheduledTime ?? 'No time'}. No notification scheduled.</Text>}
       {!!note?.items?.length && <Text style={s.helper}>Captured items: {note.items.join(', ')}</Text>}
       {note?.confidence !== undefined && note.confidence < 0.65 && <Text style={s.helper}>Low-confidence detection — review this thought.</Text>}
       <View style={s.paper}><TextInput accessibilityLabel="Note content" placeholder="Start with a thought…" placeholderTextColor={colors.muted}

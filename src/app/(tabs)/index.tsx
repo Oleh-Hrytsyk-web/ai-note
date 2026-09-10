@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteCard } from '../../components/NoteCard';
@@ -8,17 +8,34 @@ import { VoiceCapture } from '../../components/VoiceCapture';
 import { Button, Icon, SectionLabel } from '../../components/ui';
 import { useNotesStore } from '../../store/notes';
 import { colors, typeMeta } from '../../theme';
-import { noteTypes, type NoteType } from '../../types/note';
+import { noteTypes, type Note, type NoteType } from '../../types/note';
 
 export default function HomeScreen() {
   const notes = useNotesStore(s => s.notes);
   const addNote = useNotesStore(s => s.addNote);
   const [text, setText] = useState('');
   const [filter, setFilter] = useState<NoteType | 'all'>('all');
+  const list = useRef<FlatList<Note>>(null);
+  const recentOffset = useRef(0);
+  const scrollPending = useRef(false);
+  const savedId = useNotesStore(s => s.savedId);
+  const savedRevision = useNotesStore(s => s.savedRevision);
+  const storageError = useNotesStore(s => s.storageError);
   const input = useRef<TextInput>(null);
-  const [message, setMessage] = useState('');
   const [pending, setPending] = useState<string | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
+  useEffect(() => useNotesStore.subscribe((state, previous) => {
+    if (state.savedId && state.savedRevision !== previous.savedRevision) {
+      setText(''); setPending(null); setFilter('all');
+    }
+  }), []);
+  useEffect(() => {
+    if (!savedId) return;
+    scrollPending.current = true;
+    list.current?.scrollToOffset({ offset: recentOffset.current, animated: true });
+    const timer = setTimeout(() => useNotesStore.getState().acknowledgeSave(), 4000);
+    return () => clearTimeout(timer);
+  }, [savedId, savedRevision]);
   const visible = notes.filter(n => filter === 'all' || n.type === filter);
   function capture() {
     if (text.trim()) { Keyboard.dismiss(); setPending(text); }
@@ -26,11 +43,12 @@ export default function HomeScreen() {
   return <SafeAreaView edges={['top']} style={s.safe}>
     {pending !== null && <CapturePreview text={pending} onCancel={() => setPending(null)} onSave={parsed => {
       if (addNote(parsed.text, parsed.type, { scheduledDate: parsed.date, scheduledTime: parsed.time, items: parsed.items, confidence: parsed.confidence })) {
-        setText(''); setFilter('all'); setMessage('Thought added to your notebook.'); setPending(null);
+        setText(''); setFilter('all'); setPending(null);
       }
     }} />}
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <FlatList data={visible} keyExtractor={n => n.id} renderItem={({ item }) => <NoteCard note={item} />}
+      {!!savedId && !storageError && <Text accessibilityLiveRegion="polite" style={{ backgroundColor: colors.soft, color: colors.primary, padding: 12, textAlign: 'center', fontWeight: '600' }}>Saved</Text>}
+      <FlatList ref={list} onContentSizeChange={() => { if (scrollPending.current) { list.current?.scrollToOffset({ offset: recentOffset.current, animated: true }); scrollPending.current = false; } }} data={visible} keyExtractor={n => n.id} renderItem={({ item }) => <NoteCard note={item} />}
         keyboardShouldPersistTaps="handled" contentContainerStyle={s.list}
         ListHeaderComponent={<>
           <View style={s.brandRow}><View style={s.brand}><View style={s.logo}><Icon name="sparkles-outline" color="white" size={20} /></View><Text style={s.brandText}>AI Note</Text></View><View style={s.local}><View style={s.dot} /><Text style={s.localText}>On your device</Text></View></View>
@@ -48,14 +66,14 @@ export default function HomeScreen() {
               setText(combined); Keyboard.dismiss(); setPending(combined);
             }} />
           </View>
-          <Text accessibilityLiveRegion="polite" style={s.hint}>{message || 'Capture now. Make room for what’s next.'}</Text>
+          <Text accessibilityLiveRegion="polite" style={s.hint}>{'Capture now. Make room for what’s next.'}</Text>
           <View style={s.section}><Text style={s.sectionTitle}>Your thoughts</Text><Text style={s.count}>{notes.length} {notes.length === 1 ? 'thought' : 'thoughts'}</Text></View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>
             {(['all', ...noteTypes] as const).map(type => <Pressable key={type} accessibilityRole="button" accessibilityState={{ selected: filter === type }} aria-pressed={filter === type} onPress={() => setFilter(type)} style={[s.filter, filter === type && s.activeFilter]}>
               <Text style={[s.filterText, filter === type && { color: '#fff' }]}>{type === 'all' ? 'All thoughts' : `${typeMeta[type].label}${type === 'shopping' ? '' : 's'}`}</Text>
             </Pressable>)}
           </ScrollView>
-          <SectionLabel>RECENTLY ADDED</SectionLabel>
+          <View onLayout={event => { recentOffset.current = event.nativeEvent.layout.y; }}><SectionLabel>RECENT NOTES</SectionLabel></View>
         </>}
         ListEmptyComponent={<View style={s.empty}><View style={s.emptyIcon}><Icon name="leaf-outline" size={30} color={colors.primary} /></View>
           <Text style={s.emptyTitle}>{filter === 'all' ? 'A fresh page, just for you' : `No ${typeMeta[filter].label.toLowerCase()} items yet`}</Text>

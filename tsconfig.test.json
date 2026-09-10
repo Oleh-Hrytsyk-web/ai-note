@@ -10,5 +10,5 @@
     "outDir": ".test-build",
     "types": []
   },
-  "include": ["src/services/noteParser/**/*.ts", "src/types/note.ts", "src/services/speech/types.ts", "src/services/speech/speechSession.ts"]
+  "include": ["src/services/noteParser/**/*.ts", "src/types/note.ts", "src/store/notes.ts", "src/services/speech/types.ts", "src/services/speech/speechSession.ts"]
 }

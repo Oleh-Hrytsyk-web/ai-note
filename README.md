@@ -284,7 +284,7 @@ npx eas-cli@latest build --platform android --profile development
 Follow EAS project setup prompts, install the resulting internal APK on your
 phone, then run `npm start` locally and scan the QR code using the development
 app. Building on EAS uploads the project and uses your account's build allowance;
-no cloud build has been submitted as part of this implementation.
+the preview profile below produces a standalone APK.
 
 On macOS with Xcode, use `npx expo run:ios --device` for an iPhone build (Apple
 signing is required). Rebuild the native app after changing native dependencies
@@ -296,11 +296,65 @@ Phone smoke test: grant permissions; speak an English shopping list; stop and
 review; verify no note exists before Save; save and reopen. Then test Ukrainian,
 silence, permission denial, cancellation during listening, and leaving Home.
 
-Validation: 30 tests pass (18 existing parser/model tests and 12 speech lifecycle
-tests), TypeScript and ESLint pass, Expo Doctor passes all 21 checks, and
-web/Android/iOS JS/Hermes exports pass. Native APK/IPA compilation and actual
-microphone recognition have not been tested here: this workspace has no Android
-SDK/JDK or connected phone available. Bundling does not replace a device test.
+### Stage 3.5: Android voice lifecycle and capture UX
 
-Recommended Stage 4: editable transcripts/structured fields and Ukrainian parser
-rules, plus real-device voice QA before adding any external AI provider.
+Save closes interpretation, clears the draft and filters, and scrolls Home to the
+new note with a short Saved confirmation. Saving edits also returns Home and
+promotes the edited note. Save receipts are transient Zustand state; the existing
+version-1 AsyncStorage format and older notes are preserved. Storage failures
+remain visible through the existing storage error banner.
+
+Type helpers distinguish information, actions, scheduled events, and purchases.
+Reminder dates/times are emphasized on cards and details. Notifications are not enabled.
+
+The old AppState handler cancelled on every Android background event, including
+permission activities. This could invalidate a pending grant before native start.
+The session now checks existing permission, requests only when needed, rechecks
+permission after grant, and waits for an actual foreground event before starting.
+No artificial startup delay is used. Leaving during active recognition produces
+an interruption error. Unexpected native aborts are failures, not user cancels.
+
+SpeechService and speechSession remain the boundary between UI and the native
+adapter. Partial results only update listening text; only final results reach the
+existing NoteParser/CapturePreview, and saving still requires confirmation.
+Duplicate start/stop calls are ignored. Errors persist until Retry or Dismiss.
+Device locale is the default; English and Ukrainian can be selected. Android uses
+the system recognizer with no package override. The plugin supplies RECORD_AUDIO
+and the android.speech.RecognitionService visibility query. Language availability
+is determined by the recognizer; unsupported/unavailable language errors are shown
+without silently switching languages. Online recognition may need Internet access.
+
+Preview diagnostics use the [AI Note voice] console prefix and record permission,
+app state, recognizer package, locale, start/result/end and errors, never dictated
+text. With Android platform tools and USB debugging authorized, inspect them with:
+
+```sh
+adb logcat -s ReactNativeJS
+```
+
+The permission race is covered by a simulated Android background/grant/resume
+regression test. Actual device confirmation is still needed: this workspace has
+no connected phone or local Android SDK/JDK. If recognition fails, retain the
+visible error plus phone model, Android version and selected language.
+
+### Standalone Android preview (no Metro)
+
+```sh
+npx eas-cli@23.2.0 build --platform android --profile preview
+```
+
+The preview profile has developmentClient=false and builds an internally signed
+APK with its JavaScript included. It runs without a computer or Metro. Download
+the new artifact from the EAS build page on the phone, allow installation from
+that browser when Android asks, and install it over AI Note to preserve notes.
+Microphone access is requested on voice capture. Expo Go cannot run this native
+speech module; use the preview APK or a development build.
+
+Validation commands: npm run typecheck, npm run lint, npm test, npx expo-doctor,
+and npx expo export --platform all. Tests cover parser/model compatibility,
+permission and recognition lifecycle, duplicate taps, and store save receipts/order.
+
+Phone checklist: first permission grant, denial then retry, silence, cancellation,
+English/Ukrainian dictation, partial transcript, Stop and review, no save before
+confirmation, Save to Home, edit to Home, and persistence after closing/reopening.
+No LLM/API, notifications, authentication or sync has been added.

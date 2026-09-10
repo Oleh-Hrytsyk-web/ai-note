@@ -6,6 +6,7 @@ function setup(permission = async () => true) {
   let events; let starts = 0; let aborts = 0; let removals = 0; let language;
   const states = [];
   const service = createSpeechSession(async () => ({
+    getPermission: permission,
     requestPermission: permission,
     listen(value) { events = value; return () => removals++; },
     start(value) { starts++; language = value; events.started(); },
@@ -70,4 +71,57 @@ test('processing timeout recovers and releases microphone', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const f = setup(); await f.service.start(); const stopped = f.service.stop();
   t.mock.timers.tick(15001); await assert.rejects(stopped, /timed out/); assert.equal(f.aborts, 1);
+});
+const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+test('permission activity background then grant waits for foreground and starts once', async () => {
+  let granted = false; let grant; let events; let starts = 0; const states = [];
+  const service = createSpeechSession(async () => ({
+    getPermission: async () => granted,
+    requestPermission: () => new Promise(ok => { grant = () => { granted = true; ok(true); }; }),
+    listen(e) { events = e; return () => {}; },
+    start() { starts++; events.started(); }, stop() {}, abort() {},
+  }), () => 'uk-UA');
+  service.subscribe(s => states.push(s));
+  const pending = service.start(); await flush();
+  assert.equal(states.at(-1).status, 'requesting-permission');
+  service.setAppState('background'); grant(); await flush();
+  assert.equal(states.at(-1).status, 'waiting-foreground'); assert.equal(starts, 0);
+  await service.start(); service.setAppState('active'); await pending;
+  assert.equal(starts, 1); assert.equal(states.at(-1).status, 'listening'); await service.cancel();
+});
+test('already granted permission does not show a permission request', async () => {
+  const f = setup(); await f.service.start();
+  assert.equal(f.states.some(s => s.status === 'requesting-permission'), false); await f.service.cancel();
+});
+test('unexpected abort and subsequent end stay visible until dismissal', async () => {
+  const f = setup(); await f.service.start(); f.events.error('aborted', 'Recognizer disconnected'); f.events.ended();
+  f.service.setAppState('background'); f.service.setAppState('active');
+  assert.equal(f.states.at(-1).status, 'error'); assert.match(f.states.at(-1).message, /Recognizer disconnected/);
+  await f.service.cancel(); assert.equal(f.states.at(-1).status, 'idle');
+});
+test('partial transcript is displayed but never delivered as a final capture', async () => {
+  const f = setup(); await f.service.start(); f.events.result('partial', false);
+  assert.equal(f.states.at(-1).partialTranscript, 'partial'); assert.equal(f.states.at(-1).transcript, undefined);
+  f.events.ended(); assert.equal(f.states.at(-1).status, 'error');
+});
+for (const immediateError of [false, true]) test(immediateError ? 'immediate native error persists after end' : 'native start exception is visible', async () => {
+  let events; const states = [];
+  const service = createSpeechSession(async () => ({ getPermission: async () => true, requestPermission: async () => true,
+    listen(e) { events = e; return () => {}; }, start() { if (immediateError) { events.error('audio-capture', 'Microphone unavailable'); events.ended(); } else throw new Error('Start failed'); }, stop() {}, abort() {},
+  }), () => 'en-US');
+  service.subscribe(s => states.push(s)); await service.start(); assert.equal(states.at(-1).status, 'error');
+  assert.match(states.at(-1).message, immediateError ? /Microphone unavailable/ : /Start failed/);
+});
+test('duplicate stop calls issue only one native stop', async () => {
+  let events; let stops = 0;
+  const service = createSpeechSession(async () => ({ getPermission: async () => true, requestPermission: async () => true,
+    listen(e) { events = e; return () => {}; }, start() { events.started(); }, stop() { stops++; }, abort() {},
+  }), () => 'en-US');
+  await service.start(); const first = service.stop(); const second = service.stop();
+  events.result('Hello'); events.ended(); assert.deepEqual(await Promise.all([first, second]), ['Hello', 'Hello']); assert.equal(stops, 1);
+});
+test('background during actual listening produces a persistent interruption error', async () => {
+  const f = setup(); await f.service.start(); f.service.setAppState('background');
+  assert.equal(f.states.at(-1).status, 'error'); assert.equal(f.aborts, 1); f.service.setAppState('active');
+  assert.equal(f.states.at(-1).status, 'error');
 });

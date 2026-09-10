@@ -14,15 +14,15 @@ export function VoiceCapture({ onTranscript, onBusy }: { onTranscript: (text: st
   useEffect(() => { callbacks.current = { onTranscript, onBusy }; }, [onTranscript, onBusy]);
   useEffect(() => service.subscribe(snapshot => {
     setState(snapshot);
-    if (snapshot.status === 'listening') setSeconds(0);
+    if (snapshot.status === 'starting') setSeconds(0);
     callbacks.current.onBusy(!['idle', 'error'].includes(snapshot.status));
-    if (snapshot.transcript) callbacks.current.onTranscript(snapshot.transcript);
+    if (snapshot.status === 'idle' && snapshot.transcript) callbacks.current.onTranscript(snapshot.transcript);
   }), [service]);
-  useFocusEffect(useCallback(() => () => { void service.cancel(); }, [service]));
+  useFocusEffect(useCallback(() => () => { service.interrupt(); }, [service]));
   useEffect(() => {
+    service.setAppState(AppState.currentState);
     const subscription = AppState.addEventListener('change', next => {
-      // Permission dialogs may cause 'inactive'; only backgrounding cancels.
-      if (next === 'background') void service.cancel();
+      service.setAppState(next);
     });
     return () => { subscription.remove(); void service.cancel(); };
   }, [service]);
@@ -42,10 +42,11 @@ export function VoiceCapture({ onTranscript, onBusy }: { onTranscript: (text: st
       <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 17 }}>Your device’s speech service may process audio online. Ukrainian speech is supported where available; automatic note detection currently understands English.</Text>
     </>}
     {busy && <View style={{ backgroundColor: '#FAF0DA', padding: 14, borderRadius: 14, gap: 10 }}>
-      <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>{state.status === 'listening' ? `● Listening · ${seconds}s` : state.status === 'processing' ? 'Transcribing…' : 'Requesting microphone permission…'}</Text>
+      <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>{state.status === 'listening' ? `● Listening · ${seconds}s` : state.status === 'processing' ? 'Transcribing…' : state.status === 'requesting-permission' ? 'Requesting microphone access…' : state.status === 'waiting-foreground' ? 'Return to AI Note to start listening…' : 'Starting speech recognition…'}</Text>
+      {!!state.partialTranscript && <Text style={{ color: colors.ink, lineHeight: 22 }}>{state.partialTranscript}</Text>}
       {state.status === 'listening' && <Button label="Stop and review" onPress={() => { void service.stop().catch(() => {}); }} />}
       <Button label="Cancel recording" secondary onPress={() => { void service.cancel(); }} />
     </View>}
-    {state.status === 'error' && <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 13, lineHeight: 20 }}>{state.message}</Text>}
+    {state.status === 'error' && <View style={{ gap: 10, backgroundColor: '#FAF0DA', padding: 14, borderRadius: 14 }}><Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 13, lineHeight: 20 }}>{state.message}</Text><Button label="Retry voice capture" onPress={() => { void service.start(language); }} /><Button label="Dismiss" secondary onPress={() => { void service.cancel(); }} /></View>}
   </View>;
 }
